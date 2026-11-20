@@ -98,7 +98,7 @@ export async function POST(request: Request) {
           loginHint: {
             username: phone10,
             password,
-            note: "If password is too short, set Auth min password length to 4 in Supabase.",
+            note: "Password is last 6 digits. Auth min password length must be 6 in Supabase.",
           },
         },
         { status: 207 },

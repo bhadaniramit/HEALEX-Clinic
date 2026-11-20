@@ -18,8 +18,9 @@ export function patientAuthEmail(phone10: string): string {
   return `${phone10}@${PATIENT_AUTH_DOMAIN}`;
 }
 
+/** Last 6 digits — matches Supabase minimum password length (6). */
 export function patientDefaultPassword(phone10: string): string {
-  return phone10.slice(-4);
+  return phone10.slice(-6);
 }
 
 export function isPatientAuthEmail(email: string | null | undefined): boolean {

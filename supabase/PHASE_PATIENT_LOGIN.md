@@ -3,7 +3,7 @@
 When a patient is saved:
 
 - **Username (login):** 10-digit mobile number  
-- **Password:** last 4 digits of that mobile  
+- **Password:** last 6 digits of that mobile  
 - Auth email stored as: `{mobile}@patients.healex.local`
 - **No `profiles` row** for patients — app reads identity from **`patients`** by phone
 
@@ -23,12 +23,9 @@ SUPABASE_SERVICE_ROLE_KEY=eyJ...
 3. Vercel → Project → **Settings → Environment Variables** → add the same  
    (Production + Preview). **Never** prefix with `NEXT_PUBLIC_`.
 
-### 2. Allow 4-character passwords
+### 2. Password length = 6
 
-Supabase default min password length is often **6**. Last 4 digits need **4**:
+**Authentication → Sign In / Providers → Email → Minimum password length → 6**  
+(Patient password = last 6 digits of mobile.)
 
-**Authentication → Providers → Email → Minimum password length → 4**
-
-(Or Policies / password settings in your Supabase Auth UI.)
-
-Redeploy after adding the env var.
+Redeploy after adding the service role env var.

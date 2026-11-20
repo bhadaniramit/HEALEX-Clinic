@@ -26,7 +26,7 @@ export function NewPatientForm({ packages }: { packages: SessionPackage[] }) {
   );
 
   const phone10 = normalizePatientPhone(phone);
-  const previewPassword = phone10 ? phone10.slice(-4) : "————";
+  const previewPassword = phone10 ? phone10.slice(-6) : "——————";
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -141,7 +141,7 @@ export function NewPatientForm({ packages }: { packages: SessionPackage[] }) {
           placeholder="9876543210"
         />
         <span className="mt-1 block text-xs text-stone-500">
-          Unique. Login username = this number. Password = last 4 digits (
+          Unique. Login username = this number. Password = last 6 digits (
           <strong>{previewPassword}</strong>).
         </span>
       </label>
@@ -183,7 +183,7 @@ export function NewPatientForm({ packages }: { packages: SessionPackage[] }) {
             Username: <strong>{loginInfo.username}</strong>
           </p>
           <p>
-            Password: <strong>{loginInfo.password}</strong> (last 4 digits)
+            Password: <strong>{loginInfo.password}</strong> (last 6 digits)
           </p>
           <p className="mt-1 text-xs text-teal-800">Opening patient page…</p>
         </div>
