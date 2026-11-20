@@ -2,8 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
 import { formatInr } from "@/lib/format";
+import { normalizePatientPhone } from "@/lib/phone";
 import type { SessionPackage } from "@/lib/database.types";
 
 export function NewPatientForm({ packages }: { packages: SessionPackage[] }) {
@@ -15,11 +15,18 @@ export function NewPatientForm({ packages }: { packages: SessionPackage[] }) {
   const [packageId, setPackageId] = useState(packages[0]?.id ?? "");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loginInfo, setLoginInfo] = useState<{
+    username: string;
+    password: string;
+  } | null>(null);
 
   const selected = useMemo(
     () => packages.find((p) => p.id === packageId) ?? null,
     [packages, packageId],
   );
+
+  const phone10 = normalizePatientPhone(phone);
+  const previewPassword = phone10 ? phone10.slice(-4) : "————";
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -27,32 +34,58 @@ export function NewPatientForm({ packages }: { packages: SessionPackage[] }) {
       setError("Select a session package.");
       return;
     }
-
-    setLoading(true);
-    setError(null);
-
-    const supabase = createClient();
-    const { data, error: rpcError } = await supabase.rpc(
-      "create_patient_with_package",
-      {
-        p_name: name.trim(),
-        p_dob: dob,
-        p_address: address.trim(),
-        p_phone: phone.trim(),
-        p_package_id: packageId,
-      },
-    );
-
-    setLoading(false);
-
-    if (rpcError) {
-      setError(rpcError.message);
+    if (!phone10) {
+      setError("Enter a valid 10-digit mobile number.");
       return;
     }
 
-    const patient = data as { id: string };
-    router.push(`/patients/${patient.id}`);
-    router.refresh();
+    setLoading(true);
+    setError(null);
+    setLoginInfo(null);
+
+    const res = await fetch("/api/patients/create", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: name.trim(),
+        dob,
+        address: address.trim(),
+        phone: phone10,
+        packageId,
+      }),
+    });
+
+    const payload = (await res.json().catch(() => null)) as {
+      error?: string;
+      patientId?: string;
+      login?: { username: string; password: string };
+      loginHint?: { username: string; password: string };
+    } | null;
+
+    setLoading(false);
+
+    if (!res.ok && res.status !== 207) {
+      setError(payload?.error ?? "Could not save patient.");
+      return;
+    }
+
+    if (payload?.error && !payload.patientId) {
+      setError(payload.error);
+      return;
+    }
+
+    const login = payload?.login ?? payload?.loginHint ?? null;
+    if (login) {
+      setLoginInfo(login);
+    }
+
+    if (payload?.patientId) {
+      // Brief pause so staff can read credentials, then go to patient
+      window.setTimeout(() => {
+        router.push(`/patients/${payload.patientId}`);
+        router.refresh();
+      }, login ? 2500 : 0);
+    }
   }
 
   if (packages.length === 0) {
@@ -96,16 +129,20 @@ export function NewPatientForm({ packages }: { packages: SessionPackage[] }) {
         />
       </label>
       <label className="block text-sm">
-        <span className="text-stone-700">Phone number</span>
+        <span className="text-stone-700">Mobile number (10 digits)</span>
         <input
           required
-          inputMode="tel"
+          inputMode="numeric"
+          pattern="[0-9]{10}"
+          maxLength={10}
           value={phone}
-          onChange={(e) => setPhone(e.target.value)}
+          onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
           className="mt-1 w-full rounded-lg border border-stone-300 px-3 py-2 outline-none focus:border-teal-700 focus:ring-1 focus:ring-teal-700"
+          placeholder="9876543210"
         />
         <span className="mt-1 block text-xs text-stone-500">
-          Must be unique — duplicate phones are rejected.
+          Unique. Login username = this number. Password = last 4 digits (
+          <strong>{previewPassword}</strong>).
         </span>
       </label>
       <label className="block text-sm">
@@ -138,6 +175,19 @@ export function NewPatientForm({ packages }: { packages: SessionPackage[] }) {
       </div>
 
       {error ? <p className="text-sm text-red-700">{error}</p> : null}
+
+      {loginInfo ? (
+        <div className="rounded-lg border border-teal-200 bg-teal-50 px-4 py-3 text-sm text-teal-950">
+          <p className="font-semibold">Patient login created</p>
+          <p className="mt-1">
+            Username: <strong>{loginInfo.username}</strong>
+          </p>
+          <p>
+            Password: <strong>{loginInfo.password}</strong> (last 4 digits)
+          </p>
+          <p className="mt-1 text-xs text-teal-800">Opening patient page…</p>
+        </div>
+      ) : null}
 
       <button
         type="submit"
