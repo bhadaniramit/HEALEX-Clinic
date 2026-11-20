@@ -1,9 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
-  cacheComponents: true,
-  partialPrefetching: true,
+  // Auth/session pages are dynamic; keep classic App Router behavior.
   turbopack: {
     rules: {
       "*.css": {
