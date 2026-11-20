@@ -6,7 +6,9 @@ import { AppHeader } from "@/components/app-header";
 import { formatIst } from "@/lib/format";
 import { startOfTodayIstIso } from "@/lib/date-ist";
 import { PatientActions } from "./patient-actions";
+import { EditPatientForm } from "./edit-patient-form";
 import type {
+  Patient,
   Recommendation,
   SessionPackage,
   SessionRequest,
@@ -114,6 +116,10 @@ export default async function PatientDetailPage({
             </div>
           </dl>
         </div>
+
+        {profile.role === "super_admin" ? (
+          <EditPatientForm patient={patient as Patient} />
+        ) : null}
 
         <PatientActions
           patientId={patient.id}

@@ -65,6 +65,8 @@ create table if not exists public.patients (
   updated_at timestamptz not null default now()
 );
 
+create unique index if not exists patients_phone_unique on public.patients (phone);
+
 -- Link profiles.patient_id after patients exists
 do $$ begin
   alter table public.profiles
