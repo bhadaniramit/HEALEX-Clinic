@@ -16,9 +16,15 @@ export function LoginForm() {
 
     try {
       const supabase = createClient();
+      const loginId = email.trim();
+      // Staff use email; patients can enter mobile (Auth email = {digits}@patients.healex.local)
+      const authEmail = loginId.includes("@")
+        ? loginId
+        : `${loginId.replace(/\D/g, "")}@patients.healex.local`;
+
       const { data, error: signInError } =
         await supabase.auth.signInWithPassword({
-          email: email.trim(),
+          email: authEmail,
           password,
         });
 
@@ -64,11 +70,13 @@ export function LoginForm() {
   return (
     <form onSubmit={onSubmit} className="space-y-4">
       <label className="block text-sm">
-        <span className="text-stone-700">Email</span>
+        <span className="text-stone-700">Email / Mobile No.</span>
         <input
-          type="email"
+          type="text"
           required
-          autoComplete="email"
+          inputMode="email"
+          autoComplete="username"
+          placeholder="Email or mobile number"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           className="mt-1 w-full rounded-lg border border-stone-300 px-3 py-2 outline-none focus:border-teal-700 focus:ring-1 focus:ring-teal-700"

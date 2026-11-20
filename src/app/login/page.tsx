@@ -24,7 +24,7 @@ export default async function LoginPage({
           Sign in
         </h1>
         <p className="mt-2 text-sm text-stone-600">
-          Staff and patients use the account created for them by the clinic.
+          Staff: use email. Patients: use mobile number.
         </p>
         {params.error ? (
           <p className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800">
