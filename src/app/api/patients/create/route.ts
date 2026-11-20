@@ -105,25 +105,9 @@ export async function POST(request: Request) {
       );
     }
 
-    const { error: profileError } = await admin
-      .from("profiles")
-      .update({
-        role: "patient",
-        patient_id: patientRow.id,
-        full_name: name,
-      })
-      .eq("id", created.user.id);
-
-    if (profileError) {
-      return NextResponse.json(
-        {
-          error: `Patient and login created, but profile link failed: ${profileError.message}`,
-          patientId: patientRow.id,
-          userId: created.user.id,
-        },
-        { status: 207 },
-      );
-    }
+    // Patients are NOT kept in profiles — identity comes from patients.phone
+    // Remove auto-created profile row from Auth signup trigger (if any).
+    await admin.from("profiles").delete().eq("id", created.user.id);
 
     return NextResponse.json({
       patientId: patientRow.id,

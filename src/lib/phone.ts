@@ -12,10 +12,23 @@ export function normalizePatientPhone(value: string): string | null {
   return null;
 }
 
+export const PATIENT_AUTH_DOMAIN = "patients.healex.local";
+
 export function patientAuthEmail(phone10: string): string {
-  return `${phone10}@patients.healex.local`;
+  return `${phone10}@${PATIENT_AUTH_DOMAIN}`;
 }
 
 export function patientDefaultPassword(phone10: string): string {
   return phone10.slice(-4);
+}
+
+export function isPatientAuthEmail(email: string | null | undefined): boolean {
+  return (email ?? "").toLowerCase().endsWith(`@${PATIENT_AUTH_DOMAIN}`);
+}
+
+/** Extract 10-digit phone from Auth email like 9876543210@patients.healex.local */
+export function phoneFromAuthEmail(email: string | null | undefined): string | null {
+  if (!isPatientAuthEmail(email)) return null;
+  const local = (email ?? "").split("@")[0] ?? "";
+  return normalizePatientPhone(local);
 }

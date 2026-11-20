@@ -5,6 +5,9 @@ When a patient is saved:
 - **Username (login):** 10-digit mobile number  
 - **Password:** last 4 digits of that mobile  
 - Auth email stored as: `{mobile}@patients.healex.local`
+- **No `profiles` row** for patients — app reads identity from **`patients`** by phone
+
+Also run: `patient_no_profile_rls.sql` (so RLS `my_patient_id()` uses phone from JWT email).
 
 ## Required setup
 

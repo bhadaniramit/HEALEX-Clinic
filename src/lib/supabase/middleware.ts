@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { isPatientAuthEmail } from "@/lib/phone";
 
 type UserRole = "super_admin" | "admin" | "general" | "patient";
 
@@ -54,15 +55,19 @@ export async function updateSession(request: NextRequest) {
 
   let role: UserRole | null = null;
   if (user) {
-    try {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", user.id)
-        .maybeSingle();
-      role = (profile?.role as UserRole | undefined) ?? null;
-    } catch {
-      role = null;
+    if (isPatientAuthEmail(user.email)) {
+      role = "patient";
+    } else {
+      try {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", user.id)
+          .maybeSingle();
+        role = (profile?.role as UserRole | undefined) ?? null;
+      } catch {
+        role = null;
+      }
     }
   }
 
