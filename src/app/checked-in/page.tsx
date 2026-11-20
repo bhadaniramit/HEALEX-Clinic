@@ -3,6 +3,10 @@ import { createClient } from "@/lib/supabase/server";
 import { AppHeader } from "@/components/app-header";
 import { startOfTodayIstIso, todayLabelIst } from "@/lib/date-ist";
 import { CheckedInList, type OpenCheckIn } from "./checked-in-list";
+import {
+  TotalCheckedInToday,
+  type TodayCheckIn,
+} from "./total-checked-in-today";
 
 export const dynamic = "force-dynamic";
 
@@ -23,10 +27,11 @@ export default async function CheckedInPage() {
   const profile = await requireStaff();
   const supabase = await createClient();
   const since = startOfTodayIstIso();
+  const canExpandTotal =
+    profile.role === "super_admin" || profile.role === "admin";
 
-  const [{ data: openVisits, error }, { data: allTodayVisits }] =
+  const [{ data: openVisits, error }, { data: allTodayVisits, error: todayError }] =
     await Promise.all([
-      // Still on site (not checked out)
       supabase
         .from("visits")
         .select(
@@ -35,11 +40,13 @@ export default async function CheckedInPage() {
         .gte("created_at", since)
         .is("checked_out_at", null)
         .order("created_at", { ascending: false }),
-      // Every check-in today (for total unique patients)
       supabase
         .from("visits")
-        .select("patient_id")
-        .gte("created_at", since),
+        .select(
+          "id, created_at, patient_id, patients(id, name)",
+        )
+        .gte("created_at", since)
+        .order("created_at", { ascending: false }),
     ]);
 
   const rows = (openVisits as VisitRow[] | null) ?? [];
@@ -62,10 +69,37 @@ export default async function CheckedInPage() {
     }),
   );
 
+  type TodayVisitRow = {
+    id: string;
+    created_at: string;
+    patient_id: string;
+    patients: { id: string; name: string } | null;
+  };
+
+  const todayRows = (allTodayVisits as TodayVisitRow[] | null) ?? [];
+
+  // One entry per patient (earliest / first check-in of the day)
+  const firstByPatient = new Map<string, TodayVisitRow>();
+  for (const v of [...todayRows].reverse()) {
+    if (!firstByPatient.has(v.patient_id)) {
+      firstByPatient.set(v.patient_id, v);
+    }
+  }
+
+  const todayCheckIns: TodayCheckIn[] = Array.from(firstByPatient.values())
+    .map((v) => ({
+      visitId: v.id,
+      patientId: v.patient_id,
+      name: v.patients?.name ?? "Patient",
+      checkedInAt: v.created_at,
+    }))
+    .sort(
+      (a, b) =>
+        new Date(b.checkedInAt).getTime() - new Date(a.checkedInAt).getTime(),
+    );
+
   const currentlyCheckedIn = openPatients.length;
-  const totalCheckedInToday = new Set(
-    (allTodayVisits ?? []).map((v) => v.patient_id as string),
-  ).size;
+  const totalCheckedInToday = todayCheckIns.length;
 
   return (
     <div className="min-h-screen bg-stone-100">
@@ -79,7 +113,7 @@ export default async function CheckedInPage() {
           Check-ins for {todayLabelIst()} (IST)
         </p>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div className="rounded-xl border border-stone-200 bg-white p-5">
             <p className="text-sm text-stone-500">Currently checked in</p>
             <p className="mt-1 text-4xl font-semibold text-teal-900">
@@ -87,26 +121,22 @@ export default async function CheckedInPage() {
             </p>
             <p className="mt-1 text-xs text-stone-400">Not yet checked out</p>
           </div>
-          <div className="rounded-xl border border-stone-200 bg-white p-5">
-            <p className="text-sm text-stone-500">Total checked in today</p>
-            <p className="mt-1 text-4xl font-semibold text-stone-900">
-              {totalCheckedInToday}
-            </p>
-            <p className="mt-1 text-xs text-stone-400">
-              Unique patients (incl. checked out)
-            </p>
-          </div>
+          <TotalCheckedInToday
+            count={totalCheckedInToday}
+            rows={todayCheckIns}
+            canExpand={canExpandTotal}
+          />
         </div>
 
-        {error ? (
+        {error || todayError ? (
           <p className="text-sm text-red-700">
-            {error.message}
-            {error.message.includes("checked_out_at") ? (
+            {(error ?? todayError)?.message}
+            {(error ?? todayError)?.message.includes("checked_out_at") ? (
               <>
                 {" "}
                 Run{" "}
                 <code className="rounded bg-stone-200 px-1">
-                  web/supabase/checkout_migration.sql
+                  supabase/checkout_migration.sql
                 </code>{" "}
                 in Supabase SQL Editor.
               </>
