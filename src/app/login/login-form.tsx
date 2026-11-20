@@ -60,7 +60,10 @@ export function LoginForm() {
         return;
       }
 
-      window.location.assign("/patients");
+      const isPatient = authEmail
+        .toLowerCase()
+        .endsWith("@patients.healex.local");
+      window.location.assign(isPatient ? "/me" : "/patients");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Sign-in failed.");
       setLoading(false);
