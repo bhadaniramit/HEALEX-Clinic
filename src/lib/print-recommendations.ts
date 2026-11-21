@@ -146,7 +146,8 @@ export function printRecommendationsLetterhead(opts: {
 </body>
 </html>`;
 
-  const win = window.open("", "_blank", "noopener,noreferrer,width=900,height=1000");
+  // Do not use "noopener" — browsers then return null and leave a blank tab.
+  const win = window.open("", "_blank", "width=900,height=1000");
   if (!win) {
     window.alert("Please allow pop-ups to print recommendations.");
     return;
@@ -155,8 +156,17 @@ export function printRecommendationsLetterhead(opts: {
   win.document.write(html);
   win.document.close();
   win.focus();
-  // Wait for layout before print dialog
-  win.setTimeout(() => {
-    win.print();
-  }, 250);
+  const triggerPrint = () => {
+    try {
+      win.focus();
+      win.print();
+    } catch {
+      // User can still use Ctrl+P on the opened page
+    }
+  };
+  if (win.document.readyState === "complete") {
+    win.setTimeout(triggerPrint, 100);
+  } else {
+    win.addEventListener("load", () => win.setTimeout(triggerPrint, 100));
+  }
 }
