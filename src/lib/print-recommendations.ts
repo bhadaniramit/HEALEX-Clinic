@@ -44,14 +44,25 @@ export function printRecommendationsLetterhead(opts: {
   <meta charset="utf-8" />
   <title>Recommendations — ${escapeHtml(opts.patientName)}</title>
   <style>
-    @page { size: A4; margin: 18mm 18mm 22mm 18mm; }
+    /* Leave bottom margin so fixed footer does not cover content */
+    @page { size: A4; margin: 18mm 18mm 28mm 18mm; }
     * { box-sizing: border-box; }
-    body {
+    html, body {
+      height: 100%;
       margin: 0;
+    }
+    body {
       font-family: "Times New Roman", Times, serif;
       color: #111;
       font-size: 12pt;
       line-height: 1.45;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    .page {
+      flex: 1 0 auto;
+      padding-bottom: 28mm; /* space above pinned footer */
     }
     .header {
       display: flex;
@@ -96,47 +107,66 @@ export function printRecommendationsLetterhead(opts: {
     li { margin: 0 0 8px; }
     .empty { margin: 0; color: #555; font-style: italic; }
     .footer {
-      margin-top: 36px;
-      padding-top: 10px;
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      padding: 8px 0 4px;
       border-top: 2px solid #0f3d3e;
       text-align: center;
       font-size: 10.5pt;
+      background: #fff;
     }
     .clinic-name {
       font-weight: 700;
       font-size: 12pt;
       color: #0f3d3e;
     }
-    .printed { margin-top: 10px; font-size: 9pt; color: #666; }
+    .printed { margin-top: 6px; font-size: 9pt; color: #666; }
     @media print {
-      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      body {
+        display: block;
+        min-height: auto;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+      .page { padding-bottom: 0; }
+      /* Fixed footer prints at the bottom of every page */
+      .footer {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+      }
     }
   </style>
 </head>
 <body>
-  <header class="header">
-    <div>
-      <p class="doctor-name">Dr. Rajeev K Bhadani (PT)</p>
-      <p class="credentials">MSPT, FICR, BPT, MIAP</p>
-    </div>
-    <div class="contact">
-      <strong>Contact</strong>
-      Mobile: 9836115000<br/>
-      Email: rkbdoc@gmail.com
-    </div>
-  </header>
+  <div class="page">
+    <header class="header">
+      <div>
+        <p class="doctor-name">Dr. Rajeev K Bhadani (PT)</p>
+        <p class="credentials">MSPT, FICR, BPT, MIAP</p>
+      </div>
+      <div class="contact">
+        <strong>Contact</strong>
+        Mobile: 9836115000<br/>
+        Email: rkbdoc@gmail.com
+      </div>
+    </header>
 
-  <div class="meta">
-    <p><strong>Patient:</strong> ${escapeHtml(opts.patientName)}</p>
-    ${opts.phone ? `<p><strong>Mobile:</strong> ${escapeHtml(opts.phone)}</p>` : ""}
-    ${opts.dob ? `<p><strong>DOB:</strong> ${escapeHtml(opts.dob)}</p>` : ""}
+    <div class="meta">
+      <p><strong>Patient:</strong> ${escapeHtml(opts.patientName)}</p>
+      ${opts.phone ? `<p><strong>Mobile:</strong> ${escapeHtml(opts.phone)}</p>` : ""}
+      ${opts.dob ? `<p><strong>DOB:</strong> ${escapeHtml(opts.dob)}</p>` : ""}
+    </div>
+
+    <h2 class="section">Medicine</h2>
+    ${listItems(medicines)}
+
+    <h2 class="section">Exercise</h2>
+    ${listItems(exercises)}
   </div>
-
-  <h2 class="section">Medicine</h2>
-  ${listItems(medicines)}
-
-  <h2 class="section">Exercise</h2>
-  ${listItems(exercises)}
 
   <footer class="footer">
     <div class="clinic-name">Healex Pain &amp; Lifestyle Clinic</div>
