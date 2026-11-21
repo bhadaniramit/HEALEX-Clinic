@@ -112,11 +112,6 @@ export function printRecommendationsLetterhead(opts: {
       font-size: 10.5pt;
       background: #fff;
     }
-    .clinic-name {
-      font-weight: 700;
-      font-size: 12pt;
-      color: #0f3d3e;
-    }
     @media print {
       body {
         display: block;
@@ -163,8 +158,7 @@ export function printRecommendationsLetterhead(opts: {
   </div>
 
   <footer class="footer">
-    <div class="clinic-name">Healex Pain &amp; Lifestyle Clinic</div>
-    <div>GD-126, Sector 3, Near GD Block PNB, Saltlake 700106</div>
+    Address : GD-126, Sector 3, Near GD Block PNB, Saltlake 700106
   </footer>
 </body>
 </html>`;
