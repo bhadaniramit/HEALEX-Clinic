@@ -32,11 +32,6 @@ export function printRecommendationsLetterhead(opts: {
 }): void {
   const medicines = opts.recommendations.filter((r) => r.type === "medicine");
   const exercises = opts.recommendations.filter((r) => r.type === "exercise");
-  const printedOn = new Intl.DateTimeFormat("en-IN", {
-    timeZone: "Asia/Kolkata",
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date());
 
   const html = `<!DOCTYPE html>
 <html lang="en">
@@ -122,7 +117,6 @@ export function printRecommendationsLetterhead(opts: {
       font-size: 12pt;
       color: #0f3d3e;
     }
-    .printed { margin-top: 6px; font-size: 9pt; color: #666; }
     @media print {
       body {
         display: block;
@@ -171,7 +165,6 @@ export function printRecommendationsLetterhead(opts: {
   <footer class="footer">
     <div class="clinic-name">Healex Pain &amp; Lifestyle Clinic</div>
     <div>GD-126, Sector 3, Near GD Block PNB, Saltlake 700106</div>
-    <div class="printed">Printed ${escapeHtml(printedOn)} (IST)</div>
   </footer>
 </body>
 </html>`;
