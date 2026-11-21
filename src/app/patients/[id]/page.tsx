@@ -171,6 +171,9 @@ export default async function PatientDetailPage({
 
         <PatientActions
           patientId={patient.id}
+          patientName={patient.name}
+          patientPhone={patient.phone}
+          patientDob={patient.dob}
           sessionsRemaining={patient.sessions_remaining}
           role={profile.role}
           packages={(packages as SessionPackage[]) ?? []}

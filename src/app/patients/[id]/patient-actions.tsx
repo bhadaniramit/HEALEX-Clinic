@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { formatInr } from "@/lib/format";
+import { printRecommendationsLetterhead } from "@/lib/print-recommendations";
 import type {
   Payment,
   Recommendation,
@@ -14,6 +15,9 @@ import type {
 
 export function PatientActions({
   patientId,
+  patientName,
+  patientPhone,
+  patientDob,
   sessionsRemaining,
   role,
   packages,
@@ -24,6 +28,9 @@ export function PatientActions({
   payments,
 }: {
   patientId: string;
+  patientName: string;
+  patientPhone: string;
+  patientDob: string;
   sessionsRemaining: number;
   role: UserRole;
   packages: SessionPackage[];
@@ -437,9 +444,26 @@ export function PatientActions({
       ) : null}
 
       <section className="rounded-xl border border-stone-200 bg-white p-5">
-        <h2 className="font-semibold text-stone-900">
-          Medicine & exercise
-        </h2>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="font-semibold text-stone-900">
+            Medicine & exercise
+          </h2>
+          <button
+            type="button"
+            disabled={recommendations.length === 0}
+            onClick={() =>
+              printRecommendationsLetterhead({
+                patientName,
+                phone: patientPhone,
+                dob: patientDob,
+                recommendations,
+              })
+            }
+            className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm font-medium text-stone-800 hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Print
+          </button>
+        </div>
         {recommendations.length === 0 ? (
           <p className="mt-2 text-sm text-stone-500">No recommendations yet.</p>
         ) : (
