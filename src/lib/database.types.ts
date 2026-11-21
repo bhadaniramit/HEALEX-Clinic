@@ -1,5 +1,11 @@
 export type UserRole = "super_admin" | "admin" | "general" | "patient";
-export type RecommendationType = "medicine" | "exercise";
+export type RecommendationType = "medicine" | "exercise" | "diet_lifestyle";
+
+export const recommendationTypeLabel: Record<RecommendationType, string> = {
+  medicine: "Medicine",
+  exercise: "Exercise",
+  diet_lifestyle: "Diet/Lifestyle",
+};
 export type RequestStatus = "pending" | "approved" | "rejected";
 
 export type Profile = {

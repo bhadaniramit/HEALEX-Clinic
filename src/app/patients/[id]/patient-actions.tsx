@@ -8,10 +8,12 @@ import { printRecommendationsLetterhead } from "@/lib/print-recommendations";
 import type {
   Payment,
   Recommendation,
+  RecommendationType,
   SessionPackage,
   SessionRequest,
   UserRole,
 } from "@/lib/database.types";
+import { recommendationTypeLabel } from "@/lib/database.types";
 
 export function PatientActions({
   patientId,
@@ -61,7 +63,7 @@ export function PatientActions({
   const [packageId, setPackageId] = useState(packages[0]?.id ?? "");
   const [amountPaidNow, setAmountPaidNow] = useState("");
   const [payRemainingBalance, setPayRemainingBalance] = useState(false);
-  const [recType, setRecType] = useState<"medicine" | "exercise">("exercise");
+  const [recType, setRecType] = useState<RecommendationType>("exercise");
   const [recContent, setRecContent] = useState("");
 
   const selected = useMemo(
@@ -446,7 +448,7 @@ export function PatientActions({
       <section className="rounded-xl border border-stone-200 bg-white p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="font-semibold text-stone-900">
-            Medicine & exercise
+            Medicine, exercise & diet
           </h2>
           <button
             type="button"
@@ -470,7 +472,9 @@ export function PatientActions({
           <ul className="mt-3 space-y-3">
             {recommendations.map((r) => (
               <li key={r.id} className="rounded-lg bg-stone-50 px-3 py-2 text-sm">
-                <p className="font-medium capitalize text-teal-900">{r.type}</p>
+                <p className="font-medium text-teal-900">
+                  {recommendationTypeLabel[r.type] ?? r.type}
+                </p>
                 <p className="mt-1 whitespace-pre-wrap text-stone-800">
                   {r.content}
                 </p>
@@ -486,12 +490,13 @@ export function PatientActions({
               <select
                 value={recType}
                 onChange={(e) =>
-                  setRecType(e.target.value as "medicine" | "exercise")
+                  setRecType(e.target.value as RecommendationType)
                 }
                 className="mt-1 w-full rounded-lg border border-stone-300 px-3 py-2"
               >
                 <option value="exercise">Exercise</option>
                 <option value="medicine">Medicine</option>
+                <option value="diet_lifestyle">Diet/Lifestyle</option>
               </select>
             </label>
             <label className="block text-sm">

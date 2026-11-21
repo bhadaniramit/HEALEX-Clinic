@@ -124,7 +124,7 @@ export default async function MePage() {
 
         <div className="rounded-xl border border-stone-200 bg-white p-6">
           <h2 className="font-semibold text-stone-900">
-            Medicine & exercise
+            Medicine, exercise & diet
           </h2>
           {recommendations.length === 0 ? (
             <p className="mt-2 text-sm text-stone-500">
@@ -137,7 +137,13 @@ export default async function MePage() {
                   key={r.id}
                   className="rounded-lg bg-stone-50 px-3 py-2 text-sm"
                 >
-                  <p className="font-medium capitalize text-teal-900">{r.type}</p>
+                  <p className="font-medium text-teal-900">
+                    {r.type === "diet_lifestyle"
+                      ? "Diet/Lifestyle"
+                      : r.type === "medicine"
+                        ? "Medicine"
+                        : "Exercise"}
+                  </p>
                   <p className="mt-1 whitespace-pre-wrap text-stone-800">
                     {r.content}
                   </p>

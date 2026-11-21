@@ -32,6 +32,9 @@ export function printRecommendationsLetterhead(opts: {
 }): void {
   const medicines = opts.recommendations.filter((r) => r.type === "medicine");
   const exercises = opts.recommendations.filter((r) => r.type === "exercise");
+  const dietLifestyle = opts.recommendations.filter(
+    (r) => r.type === "diet_lifestyle",
+  );
 
   const html = `<!DOCTYPE html>
 <html lang="en">
@@ -155,6 +158,9 @@ export function printRecommendationsLetterhead(opts: {
 
     <h2 class="section">Exercise</h2>
     ${listItems(exercises)}
+
+    <h2 class="section">Diet/Lifestyle</h2>
+    ${listItems(dietLifestyle)}
   </div>
 
   <footer class="footer">

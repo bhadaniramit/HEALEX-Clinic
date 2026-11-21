@@ -21,7 +21,7 @@ exception when duplicate_object then null;
 end $$;
 
 do $$ begin
-  create type public.recommendation_type as enum ('medicine', 'exercise');
+  create type public.recommendation_type as enum ('medicine', 'exercise', 'diet_lifestyle');
 exception when duplicate_object then null;
 end $$;
 
