@@ -71,10 +71,9 @@ export function PatientActions({
       setAmountPaidNow(paymentBalance > 0 ? String(paymentBalance) : "");
       return;
     }
-    if (selected) {
-      setAmountPaidNow(String(selected.price));
-    }
-  }, [selected, payRemainingBalance, paymentBalance]);
+    // Manual entry when adding sessions — do not auto-fill from package price
+    setAmountPaidNow("");
+  }, [payRemainingBalance, paymentBalance]);
 
   function flash(ok: string | null, err: string | null) {
     setMessage(ok);

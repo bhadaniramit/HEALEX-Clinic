@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatInr } from "@/lib/format";
 import { normalizePatientPhone } from "@/lib/phone";
@@ -32,9 +32,7 @@ export function NewPatientForm({
     [packages, packageId],
   );
 
-  useEffect(() => {
-    if (selected) setAmountPaid(String(selected.price));
-  }, [selected]);
+  // Amount paid is entered manually — not auto-filled from package price
 
   const phone10 = normalizePatientPhone(phone);
   const previewPassword = phone10 ? phone10.slice(-6) : "——————";
