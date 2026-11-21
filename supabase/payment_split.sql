@@ -111,10 +111,10 @@ end;
 $$;
 
 -- Replace older signatures so defaults apply cleanly
-drop function if exists public.add_sessions_to_patient(uuid, uuid);
-drop function if exists public.add_sessions_to_patient(uuid, uuid, numeric);
-drop function if exists public.create_patient_with_package(text, date, text, text, uuid);
-drop function if exists public.create_patient_with_package(text, date, text, text, uuid, numeric);
+drop function if exists public.add_sessions_to_patient(uuid, uuid) cascade;
+drop function if exists public.add_sessions_to_patient(uuid, uuid, numeric) cascade;
+drop function if exists public.create_patient_with_package(text, date, text, text, uuid) cascade;
+drop function if exists public.create_patient_with_package(text, date, text, text, uuid, numeric) cascade;
 
 -- Add sessions; optional amount paid now (null = full package price)
 create or replace function public.add_sessions_to_patient(
@@ -277,14 +277,57 @@ begin
 end;
 $$;
 
--- Approve still uses add_sessions (full pay by default via null)
--- Overload-safe grants
+-- Grants (signature includes default args — do not grant the old 2-arg / 5-arg forms)
 grant execute on function public.patient_payment_totals(uuid) to authenticated;
 grant execute on function public.record_patient_payment(uuid, numeric, text) to authenticated;
 grant execute on function public.add_sessions_to_patient(uuid, uuid, numeric) to authenticated;
 grant execute on function public.create_patient_with_package(text, date, text, text, uuid, numeric) to authenticated;
--- Keep older 2-arg / 5-arg signatures callable if PostgREST cached them
-grant execute on function public.add_sessions_to_patient(uuid, uuid) to authenticated;
-grant execute on function public.create_patient_with_package(text, date, text, text, uuid) to authenticated;
+
+-- Ensure approve still works with the new add_sessions signature
+create or replace function public.approve_session_request(p_request_id uuid)
+returns public.session_requests
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_req public.session_requests;
+begin
+  if auth.uid() is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  if not public.is_admin_or_above() then
+    raise exception 'Only admin or super admin can approve requests';
+  end if;
+
+  select * into v_req
+  from public.session_requests
+  where id = p_request_id
+  for update;
+
+  if not found then
+    raise exception 'Request not found';
+  end if;
+
+  if v_req.status <> 'pending' then
+    raise exception 'Request is not pending';
+  end if;
+
+  -- null amount_paid => full package price
+  perform public.add_sessions_to_patient(v_req.patient_id, v_req.package_id, null);
+
+  update public.session_requests
+  set status = 'approved',
+      reviewed_by = auth.uid(),
+      reviewed_at = now()
+  where id = p_request_id
+  returning * into v_req;
+
+  return v_req;
+end;
+$$;
+
+grant execute on function public.approve_session_request(uuid) to authenticated;
 
 notify pgrst, 'reload schema';
