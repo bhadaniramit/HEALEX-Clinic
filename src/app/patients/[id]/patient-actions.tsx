@@ -53,8 +53,7 @@ export function PatientActions({
     busy || sessionsRemaining <= 0 || checkedInToday;
   const [packageId, setPackageId] = useState(packages[0]?.id ?? "");
   const [amountPaidNow, setAmountPaidNow] = useState("");
-  const [recordAmount, setRecordAmount] = useState("");
-  const [recordNote, setRecordNote] = useState("");
+  const [payRemainingBalance, setPayRemainingBalance] = useState(false);
   const [recType, setRecType] = useState<"medicine" | "exercise">("exercise");
   const [recContent, setRecContent] = useState("");
 
@@ -63,11 +62,19 @@ export function PatientActions({
     [packages, packageId],
   );
 
+  const maxAmountPaid = payRemainingBalance
+    ? paymentBalance
+    : (selected?.price ?? 0);
+
   useEffect(() => {
+    if (payRemainingBalance) {
+      setAmountPaidNow(paymentBalance > 0 ? String(paymentBalance) : "");
+      return;
+    }
     if (selected) {
       setAmountPaidNow(String(selected.price));
     }
-  }, [selected]);
+  }, [selected, payRemainingBalance, paymentBalance]);
 
   function flash(ok: string | null, err: string | null) {
     setMessage(ok);
@@ -96,12 +103,48 @@ export function PatientActions({
     router.refresh();
   }
 
-  async function addSessions() {
+  async function addSessionsOrPayBalance() {
+    const paid = Number(amountPaidNow);
+
+    if (payRemainingBalance) {
+      if (paymentBalance <= 0) {
+        flash(null, "No remaining balance to pay.");
+        return;
+      }
+      if (Number.isNaN(paid) || paid <= 0) {
+        flash(null, "Enter a payment amount greater than 0.");
+        return;
+      }
+      if (paid > paymentBalance) {
+        flash(
+          null,
+          `Amount cannot exceed balance (${formatInr(paymentBalance)}).`,
+        );
+        return;
+      }
+      setBusy(true);
+      flash(null, null);
+      const supabase = createClient();
+      const { error: rpcError } = await supabase.rpc("record_patient_payment", {
+        p_patient_id: patientId,
+        p_amount: paid,
+        p_note: "Pay remaining balance",
+      });
+      setBusy(false);
+      if (rpcError) {
+        flash(null, rpcError.message);
+        return;
+      }
+      setPayRemainingBalance(false);
+      flash("Balance payment recorded.", null);
+      router.refresh();
+      return;
+    }
+
     if (!packageId) {
       flash(null, "Select a package.");
       return;
     }
-    const paid = Number(amountPaidNow);
     if (
       canSplitPayment &&
       (Number.isNaN(paid) || paid < 0 || (selected && paid > selected.price))
@@ -138,35 +181,6 @@ export function PatientActions({
         : "Sessions added.",
       null,
     );
-    router.refresh();
-  }
-
-  async function recordPayment() {
-    const amount = Number(recordAmount);
-    if (Number.isNaN(amount) || amount <= 0) {
-      flash(null, "Enter a payment amount greater than 0.");
-      return;
-    }
-    if (amount > paymentBalance) {
-      flash(null, `Amount cannot exceed balance (${paymentBalance}).`);
-      return;
-    }
-    setBusy(true);
-    flash(null, null);
-    const supabase = createClient();
-    const { error: rpcError } = await supabase.rpc("record_patient_payment", {
-      p_patient_id: patientId,
-      p_amount: amount,
-      p_note: recordNote.trim() || null,
-    });
-    setBusy(false);
-    if (rpcError) {
-      flash(null, rpcError.message);
-      return;
-    }
-    setRecordAmount("");
-    setRecordNote("");
-    flash("Payment recorded.", null);
     router.refresh();
   }
 
@@ -263,13 +277,39 @@ export function PatientActions({
 
       {canManageSessions ? (
         <section className="rounded-xl border border-stone-200 bg-white p-5">
-          <h2 className="font-semibold text-stone-900">Add more sessions</h2>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="font-semibold text-stone-900">Add more sessions</h2>
+            {canSplitPayment ? (
+              <label className="flex items-center gap-2 text-sm text-stone-700">
+                <input
+                  type="checkbox"
+                  checked={payRemainingBalance}
+                  disabled={paymentBalance <= 0}
+                  onChange={(e) => setPayRemainingBalance(e.target.checked)}
+                  className="h-4 w-4 rounded border-stone-300 text-teal-800 focus:ring-teal-700"
+                />
+                Pay Remaining Balance
+              </label>
+            ) : null}
+          </div>
+
+          {canSplitPayment && payRemainingBalance ? (
+            <p className="mt-2 text-sm text-amber-800">
+              Outstanding balance: <strong>{formatInr(paymentBalance)}</strong>
+            </p>
+          ) : null}
+
           <label className="mt-3 block text-sm">
             <span className="text-stone-700">Package</span>
             <select
               value={packageId}
               onChange={(e) => setPackageId(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-stone-300 px-3 py-2"
+              disabled={payRemainingBalance}
+              className={
+                payRemainingBalance
+                  ? "mt-1 w-full cursor-not-allowed rounded-lg border border-stone-200 bg-stone-100 px-3 py-2 text-stone-400"
+                  : "mt-1 w-full rounded-lg border border-stone-300 px-3 py-2"
+              }
             >
               {packages.map((p) => (
                 <option key={p.id} value={p.id}>
@@ -278,107 +318,86 @@ export function PatientActions({
               ))}
             </select>
           </label>
-          <p className="mt-3 text-sm text-teal-900">
-            Package charge:{" "}
-            <strong>{selected ? formatInr(selected.price) : "—"}</strong>
-            {selected ? ` · +${selected.sessions_count} sessions` : null}
-          </p>
+
+          {!payRemainingBalance ? (
+            <p className="mt-3 text-sm text-teal-900">
+              Package charge:{" "}
+              <strong>{selected ? formatInr(selected.price) : "—"}</strong>
+              {selected ? ` · +${selected.sessions_count} sessions` : null}
+            </p>
+          ) : null}
+
           {canSplitPayment ? (
             <label className="mt-3 block text-sm">
-              <span className="text-stone-700">
-                Amount paid now (split allowed)
-              </span>
+              <span className="text-stone-700">Amount paid now</span>
               <input
                 type="number"
-                min={0}
+                min={payRemainingBalance ? 0.01 : 0}
                 step="0.01"
-                max={selected?.price}
+                max={maxAmountPaid}
                 value={amountPaidNow}
-                onChange={(e) => setAmountPaidNow(e.target.value)}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  const n = Number(next);
+                  if (
+                    next !== "" &&
+                    !Number.isNaN(n) &&
+                    n > maxAmountPaid
+                  ) {
+                    setAmountPaidNow(String(maxAmountPaid));
+                    return;
+                  }
+                  setAmountPaidNow(next);
+                }}
                 className="mt-1 w-full rounded-lg border border-stone-300 px-3 py-2"
               />
               <span className="mt-1 block text-xs text-stone-500">
-                Enter less than package price to leave a balance.
+                {payRemainingBalance
+                  ? `Cannot exceed balance (${formatInr(paymentBalance)}).`
+                  : "Enter less than package price to leave a balance."}
               </span>
             </label>
           ) : null}
+
           <button
             type="button"
-            disabled={busy || !packageId}
-            onClick={addSessions}
+            disabled={
+              busy ||
+              (payRemainingBalance
+                ? paymentBalance <= 0
+                : !packageId)
+            }
+            onClick={addSessionsOrPayBalance}
             className="mt-4 rounded-lg border border-teal-800 px-4 py-2 text-sm font-medium text-teal-900 hover:bg-teal-50 disabled:opacity-50"
           >
-            Add sessions
+            {payRemainingBalance ? "Pay balance" : "Add sessions"}
           </button>
         </section>
       ) : null}
 
-      {canSplitPayment ? (
+      {canSplitPayment && payments.length > 0 ? (
         <section className="rounded-xl border border-stone-200 bg-white p-5">
-          <h2 className="font-semibold text-stone-900">Record payment</h2>
-          <p className="mt-1 text-sm text-stone-600">
-            Outstanding balance:{" "}
-            <strong>{formatInr(paymentBalance)}</strong>
-          </p>
-          {paymentBalance <= 0 ? (
-            <p className="mt-3 text-sm text-stone-500">No balance due.</p>
-          ) : (
-            <div className="mt-3 space-y-3">
-              <label className="block text-sm">
-                <span className="text-stone-700">Amount</span>
-                <input
-                  type="number"
-                  min={0.01}
-                  step="0.01"
-                  max={paymentBalance}
-                  value={recordAmount}
-                  onChange={(e) => setRecordAmount(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-stone-300 px-3 py-2"
-                  placeholder="e.g. 500"
-                />
-              </label>
-              <label className="block text-sm">
-                <span className="text-stone-700">Note (optional)</span>
-                <input
-                  type="text"
-                  value={recordNote}
-                  onChange={(e) => setRecordNote(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-stone-300 px-3 py-2"
-                  placeholder="Cash / UPI / instalment…"
-                />
-              </label>
-              <button
-                type="button"
-                disabled={busy}
-                onClick={recordPayment}
-                className="rounded-lg bg-teal-800 px-4 py-2 text-sm font-medium text-white hover:bg-teal-900 disabled:opacity-50"
+          <h2 className="font-semibold text-stone-900">Payment history</h2>
+          <ul className="mt-3 divide-y divide-stone-100 text-sm">
+            {payments.map((p) => (
+              <li
+                key={p.id}
+                className="flex items-center justify-between gap-2 py-2"
               >
-                Record payment
-              </button>
-            </div>
-          )}
-          {payments.length > 0 ? (
-            <ul className="mt-4 divide-y divide-stone-100 border-t border-stone-100 pt-3 text-sm">
-              {payments.map((p) => (
-                <li
-                  key={p.id}
-                  className="flex items-center justify-between gap-2 py-2"
-                >
-                  <span className="text-stone-600">
-                    {new Date(p.created_at).toLocaleString("en-IN", {
-                      timeZone: "Asia/Kolkata",
-                      dateStyle: "medium",
-                      timeStyle: "short",
-                    })}
-                    {p.note ? ` · ${p.note}` : ""}
-                  </span>
-                  <span className="font-medium text-teal-900">
-                    {formatInr(p.amount)}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          ) : null}
+                <span className="text-stone-600">
+                  {new Date(p.created_at).toLocaleString("en-IN", {
+                    timeZone: "Asia/Kolkata",
+                    dateStyle: "medium",
+                    timeStyle: "short",
+                  })}
+                  {p.note ? ` · ${p.note}` : ""}
+                </span>
+                <span className="font-medium text-teal-900">
+                  {formatInr(p.amount)}
+                </span>
+              </li>
+            ))}
+          </ul>
         </section>
       ) : null}
 
