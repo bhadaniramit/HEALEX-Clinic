@@ -51,6 +51,22 @@ export type Purchase = {
   created_at: string;
 };
 
+export type Payment = {
+  id: string;
+  patient_id: string;
+  purchase_id: string | null;
+  amount: number;
+  note: string | null;
+  created_by: string | null;
+  created_at: string;
+};
+
+export type PaymentTotals = {
+  total_charged: number;
+  total_paid: number;
+  balance: number;
+};
+
 export type SessionRequest = {
   id: string;
   patient_id: string;

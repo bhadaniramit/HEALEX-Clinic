@@ -3,12 +3,14 @@ import { notFound } from "next/navigation";
 import { requireStaff } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { AppHeader } from "@/components/app-header";
-import { formatIst } from "@/lib/format";
+import { formatInr, formatIst } from "@/lib/format";
 import { startOfTodayIstIso } from "@/lib/date-ist";
 import { PatientActions } from "./patient-actions";
 import { EditPatientForm } from "./edit-patient-form";
 import type {
   Patient,
+  Payment,
+  PaymentTotals,
   Recommendation,
   SessionPackage,
   SessionRequest,
@@ -42,6 +44,8 @@ export default async function PatientDetailPage({
     { data: requests },
     { data: visits },
     { data: todayVisits },
+    { data: totalsRows },
+    { data: paymentRows },
   ] = await Promise.all([
     supabase
       .from("session_packages")
@@ -71,6 +75,13 @@ export default async function PatientDetailPage({
       .eq("patient_id", id)
       .gte("created_at", sinceToday)
       .limit(1),
+    supabase.rpc("patient_payment_totals", { p_patient_id: id }),
+    supabase
+      .from("payments")
+      .select("*")
+      .eq("patient_id", id)
+      .order("created_at", { ascending: false })
+      .limit(20),
   ]);
 
   const alreadyCheckedInToday = (todayVisits?.length ?? 0) > 0;
@@ -83,6 +94,16 @@ export default async function PatientDetailPage({
   }));
 
   const visitList = (visits as Visit[]) ?? [];
+  const payments = (paymentRows as Payment[] | null) ?? [];
+
+  const totalsRaw = Array.isArray(totalsRows)
+    ? totalsRows[0]
+    : (totalsRows as PaymentTotals | null);
+  const totals: PaymentTotals = {
+    total_charged: Number(totalsRaw?.total_charged ?? 0),
+    total_paid: Number(totalsRaw?.total_paid ?? 0),
+    balance: Number(totalsRaw?.balance ?? 0),
+  };
 
   return (
     <div className="min-h-screen bg-stone-100">
@@ -115,6 +136,33 @@ export default async function PatientDetailPage({
               </dd>
             </div>
           </dl>
+
+          <div className="mt-6 grid grid-cols-2 gap-3 border-t border-stone-100 pt-5 sm:grid-cols-3">
+            <div>
+              <p className="text-xs text-stone-500">Total charged</p>
+              <p className="mt-1 text-lg font-semibold text-stone-900">
+                {formatInr(totals.total_charged)}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-stone-500">Total paid</p>
+              <p className="mt-1 text-lg font-semibold text-teal-900">
+                {formatInr(totals.total_paid)}
+              </p>
+            </div>
+            <div className="col-span-2 sm:col-span-1">
+              <p className="text-xs text-stone-500">Balance</p>
+              <p
+                className={
+                  totals.balance > 0
+                    ? "mt-1 text-lg font-semibold text-amber-800"
+                    : "mt-1 text-lg font-semibold text-stone-900"
+                }
+              >
+                {formatInr(totals.balance)}
+              </p>
+            </div>
+          </div>
         </div>
 
         {profile.role === "super_admin" ? (
@@ -129,6 +177,8 @@ export default async function PatientDetailPage({
           recommendations={(recommendations as Recommendation[]) ?? []}
           pendingRequests={pendingRequests}
           alreadyCheckedInToday={alreadyCheckedInToday}
+          paymentBalance={totals.balance}
+          payments={payments}
         />
 
         <section className="rounded-xl border border-stone-200 bg-white p-5">

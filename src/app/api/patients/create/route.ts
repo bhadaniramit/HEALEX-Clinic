@@ -15,6 +15,7 @@ export async function POST(request: Request) {
       address?: string;
       phone?: string;
       packageId?: string;
+      amountPaid?: number;
     };
 
     const name = (body.name ?? "").trim();
@@ -22,6 +23,10 @@ export async function POST(request: Request) {
     const address = (body.address ?? "").trim();
     const packageId = body.packageId ?? "";
     const phone10 = normalizePatientPhone(body.phone ?? "");
+    const amountPaid =
+      typeof body.amountPaid === "number" && !Number.isNaN(body.amountPaid)
+        ? body.amountPaid
+        : undefined;
 
     if (!name || !dob || !address || !packageId) {
       return NextResponse.json(
@@ -56,15 +61,27 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Forbidden." }, { status: 403 });
     }
 
+    const rpcArgs: {
+      p_name: string;
+      p_dob: string;
+      p_address: string;
+      p_phone: string;
+      p_package_id: string;
+      p_amount_paid?: number;
+    } = {
+      p_name: name,
+      p_dob: dob,
+      p_address: address,
+      p_phone: phone10,
+      p_package_id: packageId,
+    };
+    if (profile?.role === "super_admin" && amountPaid !== undefined) {
+      rpcArgs.p_amount_paid = amountPaid;
+    }
+
     const { data: patient, error: rpcError } = await supabase.rpc(
       "create_patient_with_package",
-      {
-        p_name: name,
-        p_dob: dob,
-        p_address: address,
-        p_phone: phone10,
-        p_package_id: packageId,
-      },
+      rpcArgs,
     );
 
     if (rpcError) {

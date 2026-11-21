@@ -80,10 +80,23 @@ export async function updateSession(request: NextRequest) {
   if (
     user &&
     role === "patient" &&
-    (path.startsWith("/patients") || path.startsWith("/checked-in"))
+    (path.startsWith("/patients") ||
+      path.startsWith("/checked-in") ||
+      path.startsWith("/sales"))
   ) {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = "/me";
+    return NextResponse.redirect(redirectUrl);
+  }
+
+  if (
+    user &&
+    path.startsWith("/sales") &&
+    role !== "super_admin" &&
+    role !== "admin"
+  ) {
+    const redirectUrl = request.nextUrl.clone();
+    redirectUrl.pathname = homeForRole(role);
     return NextResponse.redirect(redirectUrl);
   }
 

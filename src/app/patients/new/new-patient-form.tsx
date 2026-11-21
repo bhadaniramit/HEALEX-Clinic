@@ -1,18 +1,25 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatInr } from "@/lib/format";
 import { normalizePatientPhone } from "@/lib/phone";
 import type { SessionPackage } from "@/lib/database.types";
 
-export function NewPatientForm({ packages }: { packages: SessionPackage[] }) {
+export function NewPatientForm({
+  packages,
+  canSplitPayment,
+}: {
+  packages: SessionPackage[];
+  canSplitPayment: boolean;
+}) {
   const router = useRouter();
   const [name, setName] = useState("");
   const [dob, setDob] = useState("");
   const [address, setAddress] = useState("");
   const [phone, setPhone] = useState("");
   const [packageId, setPackageId] = useState(packages[0]?.id ?? "");
+  const [amountPaid, setAmountPaid] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loginInfo, setLoginInfo] = useState<{
@@ -25,6 +32,10 @@ export function NewPatientForm({ packages }: { packages: SessionPackage[] }) {
     [packages, packageId],
   );
 
+  useEffect(() => {
+    if (selected) setAmountPaid(String(selected.price));
+  }, [selected]);
+
   const phone10 = normalizePatientPhone(phone);
   const previewPassword = phone10 ? phone10.slice(-6) : "——————";
 
@@ -36,6 +47,15 @@ export function NewPatientForm({ packages }: { packages: SessionPackage[] }) {
     }
     if (!phone10) {
       setError("Enter a valid 10-digit mobile number.");
+      return;
+    }
+
+    const paid = Number(amountPaid);
+    if (
+      canSplitPayment &&
+      (Number.isNaN(paid) || paid < 0 || (selected && paid > selected.price))
+    ) {
+      setError("Enter a valid amount paid (0 to package price).");
       return;
     }
 
@@ -52,6 +72,7 @@ export function NewPatientForm({ packages }: { packages: SessionPackage[] }) {
         address: address.trim(),
         phone: phone10,
         packageId,
+        ...(canSplitPayment ? { amountPaid: paid } : {}),
       }),
     });
 
@@ -162,7 +183,7 @@ export function NewPatientForm({ packages }: { packages: SessionPackage[] }) {
       </label>
 
       <div className="rounded-lg bg-teal-50 px-4 py-3 text-sm text-teal-950">
-        <span className="text-teal-800">Charges: </span>
+        <span className="text-teal-800">Package charge: </span>
         <span className="text-lg font-semibold">
           {selected ? formatInr(selected.price) : "—"}
         </span>
@@ -173,6 +194,27 @@ export function NewPatientForm({ packages }: { packages: SessionPackage[] }) {
           </span>
         ) : null}
       </div>
+
+      {canSplitPayment ? (
+        <label className="block text-sm">
+          <span className="text-stone-700">
+            Amount paid now (split allowed)
+          </span>
+          <input
+            type="number"
+            min={0}
+            step="0.01"
+            max={selected?.price}
+            value={amountPaid}
+            onChange={(e) => setAmountPaid(e.target.value)}
+            className="mt-1 w-full rounded-lg border border-stone-300 px-3 py-2 outline-none focus:border-teal-700 focus:ring-1 focus:ring-teal-700"
+          />
+          <span className="mt-1 block text-xs text-stone-500">
+            Enter less than package price to leave a balance on the patient
+            page.
+          </span>
+        </label>
+      ) : null}
 
       {error ? <p className="text-sm text-red-700">{error}</p> : null}
 

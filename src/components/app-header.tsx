@@ -16,9 +16,11 @@ export function AppHeader({
 }: {
   profile: Profile;
   title: string;
-  activeTab?: "patients" | "checked-in" | "me";
+  activeTab?: "patients" | "checked-in" | "sales" | "me";
 }) {
   const staff = isStaffRole(profile.role);
+  const canSeeSales =
+    profile.role === "super_admin" || profile.role === "admin";
 
   return (
     <header className="border-b border-stone-200 bg-white">
@@ -44,7 +46,7 @@ export function AppHeader({
         </div>
 
         {staff ? (
-          <nav className="mt-4 flex gap-1 rounded-lg bg-stone-100 p-1">
+          <nav className="mt-4 flex flex-wrap gap-1 rounded-lg bg-stone-100 p-1">
             <TabLink
               href="/patients"
               label="Patients"
@@ -55,6 +57,13 @@ export function AppHeader({
               label="Checked in today"
               active={activeTab === "checked-in"}
             />
+            {canSeeSales ? (
+              <TabLink
+                href="/sales"
+                label="Total Sale Today"
+                active={activeTab === "sales"}
+              />
+            ) : null}
           </nav>
         ) : null}
       </div>

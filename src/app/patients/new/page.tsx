@@ -29,7 +29,10 @@ export default async function NewPatientPage() {
           Enter patient details and choose a session package. Charges come from
           the database.
         </p>
-        <NewPatientForm packages={(packages as SessionPackage[]) ?? []} />
+        <NewPatientForm
+          packages={(packages as SessionPackage[]) ?? []}
+          canSplitPayment={profile.role === "super_admin"}
+        />
         <Link
           href="/patients"
           className="inline-block text-sm font-medium text-teal-900 hover:underline"

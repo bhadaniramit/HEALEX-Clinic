@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { formatInr } from "@/lib/format";
 import type {
+  Payment,
   Recommendation,
   SessionPackage,
   SessionRequest,
@@ -19,6 +20,8 @@ export function PatientActions({
   recommendations,
   pendingRequests,
   alreadyCheckedInToday,
+  paymentBalance,
+  payments,
 }: {
   patientId: string;
   sessionsRemaining: number;
@@ -27,10 +30,13 @@ export function PatientActions({
   recommendations: Recommendation[];
   pendingRequests: (SessionRequest & { package_name?: string })[];
   alreadyCheckedInToday: boolean;
+  paymentBalance: number;
+  payments: Payment[];
 }) {
   const router = useRouter();
   const canManageSessions = role === "super_admin" || role === "admin";
   const canWriteRecs = role === "super_admin";
+  const canSplitPayment = role === "super_admin";
   const canCheckIn =
     role === "super_admin" || role === "admin" || role === "general";
 
@@ -46,6 +52,9 @@ export function PatientActions({
   const checkInDisabled =
     busy || sessionsRemaining <= 0 || checkedInToday;
   const [packageId, setPackageId] = useState(packages[0]?.id ?? "");
+  const [amountPaidNow, setAmountPaidNow] = useState("");
+  const [recordAmount, setRecordAmount] = useState("");
+  const [recordNote, setRecordNote] = useState("");
   const [recType, setRecType] = useState<"medicine" | "exercise">("exercise");
   const [recContent, setRecContent] = useState("");
 
@@ -53,6 +62,12 @@ export function PatientActions({
     () => packages.find((p) => p.id === packageId) ?? null,
     [packages, packageId],
   );
+
+  useEffect(() => {
+    if (selected) {
+      setAmountPaidNow(String(selected.price));
+    }
+  }, [selected]);
 
   function flash(ok: string | null, err: string | null) {
     setMessage(ok);
@@ -86,19 +101,72 @@ export function PatientActions({
       flash(null, "Select a package.");
       return;
     }
+    const paid = Number(amountPaidNow);
+    if (
+      canSplitPayment &&
+      (Number.isNaN(paid) || paid < 0 || (selected && paid > selected.price))
+    ) {
+      flash(null, "Enter a valid amount paid (0 to package price).");
+      return;
+    }
     setBusy(true);
     flash(null, null);
     const supabase = createClient();
-    const { error: rpcError } = await supabase.rpc("add_sessions_to_patient", {
+    const args: {
+      p_patient_id: string;
+      p_package_id: string;
+      p_amount_paid?: number;
+    } = {
       p_patient_id: patientId,
       p_package_id: packageId,
+    };
+    if (canSplitPayment) {
+      args.p_amount_paid = paid;
+    }
+    const { error: rpcError } = await supabase.rpc(
+      "add_sessions_to_patient",
+      args,
+    );
+    setBusy(false);
+    if (rpcError) {
+      flash(null, rpcError.message);
+      return;
+    }
+    flash(
+      canSplitPayment && selected && paid < selected.price
+        ? "Sessions added with partial payment."
+        : "Sessions added.",
+      null,
+    );
+    router.refresh();
+  }
+
+  async function recordPayment() {
+    const amount = Number(recordAmount);
+    if (Number.isNaN(amount) || amount <= 0) {
+      flash(null, "Enter a payment amount greater than 0.");
+      return;
+    }
+    if (amount > paymentBalance) {
+      flash(null, `Amount cannot exceed balance (${paymentBalance}).`);
+      return;
+    }
+    setBusy(true);
+    flash(null, null);
+    const supabase = createClient();
+    const { error: rpcError } = await supabase.rpc("record_patient_payment", {
+      p_patient_id: patientId,
+      p_amount: amount,
+      p_note: recordNote.trim() || null,
     });
     setBusy(false);
     if (rpcError) {
       flash(null, rpcError.message);
       return;
     }
-    flash("Sessions added.", null);
+    setRecordAmount("");
+    setRecordNote("");
+    flash("Payment recorded.", null);
     router.refresh();
   }
 
@@ -211,10 +279,29 @@ export function PatientActions({
             </select>
           </label>
           <p className="mt-3 text-sm text-teal-900">
-            Charges:{" "}
+            Package charge:{" "}
             <strong>{selected ? formatInr(selected.price) : "—"}</strong>
             {selected ? ` · +${selected.sessions_count} sessions` : null}
           </p>
+          {canSplitPayment ? (
+            <label className="mt-3 block text-sm">
+              <span className="text-stone-700">
+                Amount paid now (split allowed)
+              </span>
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                max={selected?.price}
+                value={amountPaidNow}
+                onChange={(e) => setAmountPaidNow(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-stone-300 px-3 py-2"
+              />
+              <span className="mt-1 block text-xs text-stone-500">
+                Enter less than package price to leave a balance.
+              </span>
+            </label>
+          ) : null}
           <button
             type="button"
             disabled={busy || !packageId}
@@ -223,6 +310,75 @@ export function PatientActions({
           >
             Add sessions
           </button>
+        </section>
+      ) : null}
+
+      {canSplitPayment ? (
+        <section className="rounded-xl border border-stone-200 bg-white p-5">
+          <h2 className="font-semibold text-stone-900">Record payment</h2>
+          <p className="mt-1 text-sm text-stone-600">
+            Outstanding balance:{" "}
+            <strong>{formatInr(paymentBalance)}</strong>
+          </p>
+          {paymentBalance <= 0 ? (
+            <p className="mt-3 text-sm text-stone-500">No balance due.</p>
+          ) : (
+            <div className="mt-3 space-y-3">
+              <label className="block text-sm">
+                <span className="text-stone-700">Amount</span>
+                <input
+                  type="number"
+                  min={0.01}
+                  step="0.01"
+                  max={paymentBalance}
+                  value={recordAmount}
+                  onChange={(e) => setRecordAmount(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-stone-300 px-3 py-2"
+                  placeholder="e.g. 500"
+                />
+              </label>
+              <label className="block text-sm">
+                <span className="text-stone-700">Note (optional)</span>
+                <input
+                  type="text"
+                  value={recordNote}
+                  onChange={(e) => setRecordNote(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-stone-300 px-3 py-2"
+                  placeholder="Cash / UPI / instalment…"
+                />
+              </label>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={recordPayment}
+                className="rounded-lg bg-teal-800 px-4 py-2 text-sm font-medium text-white hover:bg-teal-900 disabled:opacity-50"
+              >
+                Record payment
+              </button>
+            </div>
+          )}
+          {payments.length > 0 ? (
+            <ul className="mt-4 divide-y divide-stone-100 border-t border-stone-100 pt-3 text-sm">
+              {payments.map((p) => (
+                <li
+                  key={p.id}
+                  className="flex items-center justify-between gap-2 py-2"
+                >
+                  <span className="text-stone-600">
+                    {new Date(p.created_at).toLocaleString("en-IN", {
+                      timeZone: "Asia/Kolkata",
+                      dateStyle: "medium",
+                      timeStyle: "short",
+                    })}
+                    {p.note ? ` · ${p.note}` : ""}
+                  </span>
+                  <span className="font-medium text-teal-900">
+                    {formatInr(p.amount)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
         </section>
       ) : null}
 
