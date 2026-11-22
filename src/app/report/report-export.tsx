@@ -2,7 +2,13 @@
 
 import { useState } from "react";
 
-export function SalesExport({ defaultFrom, defaultTo }: { defaultFrom: string; defaultTo: string }) {
+export function ReportExport({
+  defaultFrom,
+  defaultTo,
+}: {
+  defaultFrom: string;
+  defaultTo: string;
+}) {
   const [from, setFrom] = useState(defaultFrom);
   const [to, setTo] = useState(defaultTo);
   const [busy, setBusy] = useState<"balance" | "paid" | null>(null);

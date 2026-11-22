@@ -3,12 +3,7 @@ import { requireStaff } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { AppHeader } from "@/components/app-header";
 import { formatInr, formatIst } from "@/lib/format";
-import {
-  startOfTodayIstIso,
-  todayDateIst,
-  todayLabelIst,
-} from "@/lib/date-ist";
-import { SalesExport } from "./sales-export";
+import { startOfTodayIstIso, todayLabelIst } from "@/lib/date-ist";
 
 export const dynamic = "force-dynamic";
 
@@ -28,7 +23,6 @@ export default async function TotalSaleTodayPage() {
 
   const supabase = await createClient();
   const since = startOfTodayIstIso();
-  const todayYmd = todayDateIst();
 
   const { data, error } = await supabase
     .from("payments")
@@ -60,8 +54,6 @@ export default async function TotalSaleTodayPage() {
             {rows.length} payment{rows.length === 1 ? "" : "s"}
           </p>
         </div>
-
-        <SalesExport defaultFrom={todayYmd} defaultTo={todayYmd} />
 
         {error ? (
           <p className="text-sm text-red-700">

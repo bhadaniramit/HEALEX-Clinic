@@ -82,7 +82,8 @@ export async function updateSession(request: NextRequest) {
     role === "patient" &&
     (path.startsWith("/patients") ||
       path.startsWith("/checked-in") ||
-      path.startsWith("/sales"))
+      path.startsWith("/sales") ||
+      path.startsWith("/report"))
   ) {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = "/me";
@@ -91,7 +92,7 @@ export async function updateSession(request: NextRequest) {
 
   if (
     user &&
-    path.startsWith("/sales") &&
+    (path.startsWith("/sales") || path.startsWith("/report")) &&
     role !== "super_admin" &&
     role !== "admin"
   ) {

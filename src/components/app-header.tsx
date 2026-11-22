@@ -16,10 +16,10 @@ export function AppHeader({
 }: {
   profile: Profile;
   title: string;
-  activeTab?: "patients" | "checked-in" | "sales" | "me";
+  activeTab?: "patients" | "checked-in" | "sales" | "report" | "me";
 }) {
   const staff = isStaffRole(profile.role);
-  const canSeeSales =
+  const canSeeSalesAndReport =
     profile.role === "super_admin" || profile.role === "admin";
 
   return (
@@ -57,11 +57,18 @@ export function AppHeader({
               label="Checked in today"
               active={activeTab === "checked-in"}
             />
-            {canSeeSales ? (
+            {canSeeSalesAndReport ? (
               <TabLink
                 href="/sales"
                 label="Total Sale Today"
                 active={activeTab === "sales"}
+              />
+            ) : null}
+            {canSeeSalesAndReport ? (
+              <TabLink
+                href="/report"
+                label="Report"
+                active={activeTab === "report"}
               />
             ) : null}
           </nav>
