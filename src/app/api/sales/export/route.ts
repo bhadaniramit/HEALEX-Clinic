@@ -65,16 +65,15 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
-    type PayRow = {
-      amount: number;
-      patient_id: string;
-      patients: { name: string } | null;
-    };
-
     const byPatient = new Map<string, { name: string; paid: number }>();
-    for (const row of (data as PayRow[] | null) ?? []) {
-      const id = row.patient_id;
-      const name = row.patients?.name ?? "Patient";
+    for (const row of data ?? []) {
+      const id = String(row.patient_id);
+      const related = row.patients as
+        | { name?: string }
+        | { name?: string }[]
+        | null;
+      const patient = Array.isArray(related) ? related[0] : related;
+      const name = patient?.name ?? "Patient";
       const prev = byPatient.get(id);
       const amount = Number(row.amount) || 0;
       if (prev) {
