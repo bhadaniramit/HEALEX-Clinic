@@ -43,7 +43,8 @@ export function PatientActions({
   payments: Payment[];
 }) {
   const router = useRouter();
-  const canManageSessions = role === "super_admin" || role === "admin";
+  const canAddSessions = role === "super_admin";
+  const canReviewRequests = role === "super_admin" || role === "admin";
   const canWriteRecs = role === "super_admin";
   const canSplitPayment = role === "super_admin";
   const canCheckIn =
@@ -154,8 +155,9 @@ export function PatientActions({
       return;
     }
     if (
-      canSplitPayment &&
-      (Number.isNaN(paid) || paid < 0 || (selected && paid > selected.price))
+      Number.isNaN(paid) ||
+      paid < 0 ||
+      (selected && paid > selected.price)
     ) {
       flash(null, "Enter a valid amount paid (0 to package price).");
       return;
@@ -163,20 +165,13 @@ export function PatientActions({
     setBusy(true);
     flash(null, null);
     const supabase = createClient();
-    const args: {
-      p_patient_id: string;
-      p_package_id: string;
-      p_amount_paid?: number;
-    } = {
-      p_patient_id: patientId,
-      p_package_id: packageId,
-    };
-    if (canSplitPayment) {
-      args.p_amount_paid = paid;
-    }
     const { error: rpcError } = await supabase.rpc(
       "add_sessions_to_patient",
-      args,
+      {
+        p_patient_id: patientId,
+        p_package_id: packageId,
+        p_amount_paid: paid,
+      },
     );
     setBusy(false);
     if (rpcError) {
@@ -184,7 +179,7 @@ export function PatientActions({
       return;
     }
     flash(
-      canSplitPayment && selected && paid < selected.price
+      selected && paid < selected.price
         ? "Sessions added with partial payment."
         : "Sessions added.",
       null,
@@ -283,7 +278,7 @@ export function PatientActions({
         </section>
       ) : null}
 
-      {canManageSessions ? (
+      {canAddSessions ? (
         <section className="rounded-xl border border-stone-200 bg-white p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="font-semibold text-stone-900">Add more sessions</h2>
@@ -335,37 +330,35 @@ export function PatientActions({
             </p>
           ) : null}
 
-          {canSplitPayment ? (
-            <label className="mt-3 block text-sm">
-              <span className="text-stone-700">Amount paid now</span>
-              <input
-                type="number"
-                min={payRemainingBalance ? 0.01 : 0}
-                step="0.01"
-                max={maxAmountPaid}
-                value={amountPaidNow}
-                onChange={(e) => {
-                  const next = e.target.value;
-                  const n = Number(next);
-                  if (
-                    next !== "" &&
-                    !Number.isNaN(n) &&
-                    n > maxAmountPaid
-                  ) {
-                    setAmountPaidNow(String(maxAmountPaid));
-                    return;
-                  }
-                  setAmountPaidNow(next);
-                }}
-                className="mt-1 w-full rounded-lg border border-stone-300 px-3 py-2"
-              />
-              <span className="mt-1 block text-xs text-stone-500">
-                {payRemainingBalance
-                  ? `Cannot exceed balance (${formatInr(paymentBalance)}).`
-                  : "Enter less than package price to leave a balance."}
-              </span>
-            </label>
-          ) : null}
+          <label className="mt-3 block text-sm">
+            <span className="text-stone-700">Amount paid now</span>
+            <input
+              type="number"
+              min={payRemainingBalance ? 0.01 : 0}
+              step="0.01"
+              max={maxAmountPaid}
+              value={amountPaidNow}
+              onChange={(e) => {
+                const next = e.target.value;
+                const n = Number(next);
+                if (
+                  next !== "" &&
+                  !Number.isNaN(n) &&
+                  n > maxAmountPaid
+                ) {
+                  setAmountPaidNow(String(maxAmountPaid));
+                  return;
+                }
+                setAmountPaidNow(next);
+              }}
+              className="mt-1 w-full rounded-lg border border-stone-300 px-3 py-2"
+            />
+            <span className="mt-1 block text-xs text-stone-500">
+              {payRemainingBalance
+                ? `Cannot exceed balance (${formatInr(paymentBalance)}).`
+                : "Enter less than package price to leave a balance."}
+            </span>
+          </label>
 
           <button
             type="button"
@@ -409,7 +402,7 @@ export function PatientActions({
         </section>
       ) : null}
 
-      {canManageSessions && pendingRequests.length > 0 ? (
+      {canReviewRequests && pendingRequests.length > 0 ? (
         <section className="rounded-xl border border-stone-200 bg-white p-5">
           <h2 className="font-semibold text-stone-900">
             Pending session requests
