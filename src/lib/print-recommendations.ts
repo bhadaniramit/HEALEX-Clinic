@@ -40,7 +40,7 @@ export function printRecommendationsLetterhead(opts: {
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Recommendations — ${escapeHtml(opts.patientName)}</title>
+  <title></title>
   <style>
     /* Leave bottom margin so fixed footer does not cover content */
     @page { size: A4; margin: 18mm 18mm 28mm 18mm; }
