@@ -42,8 +42,8 @@ export function printRecommendationsLetterhead(opts: {
   <meta charset="utf-8" />
   <title></title>
   <style>
-    /* Leave bottom margin so fixed footer does not cover content */
-    @page { size: A4; margin: 18mm 18mm 28mm 18mm; }
+    /* Bottom margin 0" so footer sits flush with page bottom */
+    @page { size: A4; margin: 18mm 18mm 0 18mm; }
     * { box-sizing: border-box; }
     html, body {
       height: 100%;
@@ -60,7 +60,7 @@ export function printRecommendationsLetterhead(opts: {
     }
     .page {
       flex: 1 0 auto;
-      padding-bottom: 28mm; /* space above pinned footer */
+      padding-bottom: 18mm; /* keep body text above footer */
     }
     .header {
       display: flex;
@@ -109,7 +109,8 @@ export function printRecommendationsLetterhead(opts: {
       left: 0;
       right: 0;
       bottom: 0;
-      padding: 8px 0 4px;
+      margin: 0;
+      padding: 6px 18mm 0;
       border-top: 2px solid #0f3d3e;
       text-align: center;
       font-size: 10.5pt;
@@ -122,13 +123,14 @@ export function printRecommendationsLetterhead(opts: {
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
       }
-      .page { padding-bottom: 0; }
-      /* Fixed footer prints at the bottom of every page */
+      .page { padding-bottom: 18mm; }
       .footer {
         position: fixed;
         bottom: 0;
         left: 0;
         right: 0;
+        margin: 0;
+        padding-bottom: 0;
       }
     }
   </style>
