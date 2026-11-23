@@ -10,16 +10,9 @@ const YMD = /^\d{4}-\d{2}-\d{2}$/;
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
-  const type = url.searchParams.get("type"); // balance | paid
   const from = url.searchParams.get("from") ?? "";
   const to = url.searchParams.get("to") ?? "";
 
-  if (type !== "balance" && type !== "paid") {
-    return NextResponse.json(
-      { error: "type must be balance or paid." },
-      { status: 400 },
-    );
-  }
   if (!YMD.test(from) || !YMD.test(to)) {
     return NextResponse.json(
       { error: "from and to must be YYYY-MM-DD." },
@@ -54,77 +47,58 @@ export async function GET(request: Request) {
   const rangeStart = startOfIstDateIso(from);
   const rangeEnd = endExclusiveOfIstDateIso(to);
 
-  if (type === "paid") {
-    const { data, error } = await supabase
-      .from("payments")
-      .select("amount, patient_id, patients(name)")
-      .gte("created_at", rangeStart)
-      .lt("created_at", rangeEnd);
+  // Patients with payment or purchase activity in the selected range
+  const [{ data: payInRange, error: payRangeError }, { data: purchInRange, error: purchRangeError }] =
+    await Promise.all([
+      supabase
+        .from("payments")
+        .select("patient_id")
+        .gte("created_at", rangeStart)
+        .lt("created_at", rangeEnd),
+      supabase
+        .from("purchases")
+        .select("patient_id")
+        .gte("created_at", rangeStart)
+        .lt("created_at", rangeEnd),
+    ]);
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
-    }
-
-    const byPatient = new Map<string, { name: string; paid: number }>();
-    for (const row of data ?? []) {
-      const id = String(row.patient_id);
-      const related = row.patients as
-        | { name?: string }
-        | { name?: string }[]
-        | null;
-      const patient = Array.isArray(related) ? related[0] : related;
-      const name = patient?.name ?? "Patient";
-      const prev = byPatient.get(id);
-      const amount = Number(row.amount) || 0;
-      if (prev) {
-        prev.paid += amount;
-      } else {
-        byPatient.set(id, { name, paid: amount });
-      }
-    }
-
-    const rows = Array.from(byPatient.values())
-      .sort((a, b) => a.name.localeCompare(b.name))
-      .map((r) => [r.name, r.paid.toFixed(2)]);
-
-    const csv = toCsv(["Patient Name", "Amount Paid"], rows);
-    const filename = `patient-amount-paid_${from}_to_${to}.csv`;
-    return new NextResponse(csv, {
-      status: 200,
-      headers: {
-        "Content-Type": "text/csv; charset=utf-8",
-        "Content-Disposition": `attachment; filename="${filename}"`,
+  if (payRangeError || purchRangeError) {
+    return NextResponse.json(
+      {
+        error:
+          payRangeError?.message ??
+          purchRangeError?.message ??
+          "Export failed.",
       },
-    });
-  }
-
-  // balance: patients with payment activity in range → current name + balance
-  const { data: payRows, error: payError } = await supabase
-    .from("payments")
-    .select("patient_id")
-    .gte("created_at", rangeStart)
-    .lt("created_at", rangeEnd);
-
-  if (payError) {
-    return NextResponse.json({ error: payError.message }, { status: 400 });
+      { status: 400 },
+    );
   }
 
   const patientIds = [
-    ...new Set(
-      ((payRows as { patient_id: string }[] | null) ?? []).map(
+    ...new Set([
+      ...((payInRange as { patient_id: string }[] | null) ?? []).map(
         (r) => r.patient_id,
       ),
-    ),
+      ...((purchInRange as { patient_id: string }[] | null) ?? []).map(
+        (r) => r.patient_id,
+      ),
+    ]),
+  ];
+
+  const headers = [
+    "Patient Name",
+    "Total Amount Charged",
+    "Total Amount Paid",
+    "Total Balance Amount",
   ];
 
   if (patientIds.length === 0) {
-    const csv = toCsv(["Patient Name", "Balance"], []);
-    const filename = `patient-balance_${from}_to_${to}.csv`;
+    const csv = toCsv(headers, []);
     return new NextResponse(csv, {
       status: 200,
       headers: {
         "Content-Type": "text/csv; charset=utf-8",
-        "Content-Disposition": `attachment; filename="${filename}"`,
+        "Content-Disposition": `attachment; filename="patient-payment-details_${from}_to_${to}.csv"`,
       },
     });
   }
@@ -164,32 +138,33 @@ export async function GET(request: Request) {
 
   const charged = new Map<string, number>();
   for (const r of purchaseRows ?? []) {
-    charged.set(
-      r.patient_id as string,
-      (charged.get(r.patient_id as string) ?? 0) + Number(r.amount),
-    );
+    const id = r.patient_id as string;
+    charged.set(id, (charged.get(id) ?? 0) + Number(r.amount));
   }
   const paid = new Map<string, number>();
   for (const r of allPayRows ?? []) {
-    paid.set(
-      r.patient_id as string,
-      (paid.get(r.patient_id as string) ?? 0) + Number(r.amount),
-    );
+    const id = r.patient_id as string;
+    paid.set(id, (paid.get(id) ?? 0) + Number(r.amount));
   }
 
-  const rows: Array<[string, string]> = (patients ?? []).map((p) => {
-    const balance =
-      (charged.get(p.id) ?? 0) - (paid.get(p.id) ?? 0);
-    return [p.name as string, balance.toFixed(2)];
+  const rows = (patients ?? []).map((p) => {
+    const totalCharged = charged.get(p.id) ?? 0;
+    const totalPaid = paid.get(p.id) ?? 0;
+    const balance = totalCharged - totalPaid;
+    return [
+      p.name as string,
+      totalCharged.toFixed(2),
+      totalPaid.toFixed(2),
+      balance.toFixed(2),
+    ];
   });
 
-  const csv = toCsv(["Patient Name", "Balance"], rows);
-  const filename = `patient-balance_${from}_to_${to}.csv`;
+  const csv = toCsv(headers, rows);
   return new NextResponse(csv, {
     status: 200,
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
-      "Content-Disposition": `attachment; filename="${filename}"`,
+      "Content-Disposition": `attachment; filename="patient-payment-details_${from}_to_${to}.csv"`,
     },
   });
 }
