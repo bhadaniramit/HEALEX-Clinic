@@ -283,7 +283,7 @@ grant execute on function public.record_patient_payment(uuid, numeric, text) to 
 grant execute on function public.add_sessions_to_patient(uuid, uuid, numeric) to authenticated;
 grant execute on function public.create_patient_with_package(text, date, text, text, uuid, numeric) to authenticated;
 
--- Ensure approve still works with the new add_sessions signature
+-- Approve patient request: add sessions + charge to Balance only (no payment)
 create or replace function public.approve_session_request(p_request_id uuid)
 returns public.session_requests
 language plpgsql
@@ -292,6 +292,7 @@ set search_path = public
 as $$
 declare
   v_req public.session_requests;
+  v_pkg public.session_packages;
 begin
   if auth.uid() is null then
     raise exception 'Not authenticated';
@@ -314,8 +315,21 @@ begin
     raise exception 'Request is not pending';
   end if;
 
-  -- null amount_paid => full package price
-  perform public.add_sessions_to_patient(v_req.patient_id, v_req.package_id, null);
+  select * into v_pkg
+  from public.session_packages
+  where id = v_req.package_id and active = true;
+
+  if not found then
+    raise exception 'Package not found or inactive';
+  end if;
+
+  update public.patients
+  set sessions_remaining = sessions_remaining + v_pkg.sessions_count,
+      updated_at = now()
+  where id = v_req.patient_id;
+
+  insert into public.purchases (patient_id, package_id, sessions_added, amount, created_by)
+  values (v_req.patient_id, v_req.package_id, v_pkg.sessions_count, v_pkg.price, auth.uid());
 
   update public.session_requests
   set status = 'approved',

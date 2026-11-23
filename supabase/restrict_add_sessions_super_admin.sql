@@ -83,7 +83,6 @@ as $$
 declare
   v_req public.session_requests;
   v_pkg public.session_packages;
-  v_purchase_id uuid;
 begin
   if auth.uid() is null then
     raise exception 'Not authenticated';
@@ -119,18 +118,9 @@ begin
       updated_at = now()
   where id = v_req.patient_id;
 
+  -- Charge only → Balance increases. Do not record Total Paid.
   insert into public.purchases (patient_id, package_id, sessions_added, amount, created_by)
-  values (v_req.patient_id, v_req.package_id, v_pkg.sessions_count, v_pkg.price, auth.uid())
-  returning id into v_purchase_id;
-
-  insert into public.payments (patient_id, purchase_id, amount, note, created_by)
-  values (
-    v_req.patient_id,
-    v_purchase_id,
-    v_pkg.price,
-    'Paid on request approval',
-    auth.uid()
-  );
+  values (v_req.patient_id, v_req.package_id, v_pkg.sessions_count, v_pkg.price, auth.uid());
 
   update public.session_requests
   set status = 'approved',
