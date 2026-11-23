@@ -46,7 +46,7 @@ export function PatientActions({
   const canAddSessions = role === "super_admin";
   const canReviewRequests = role === "super_admin" || role === "admin";
   const canWriteRecs = role === "super_admin";
-  const canSplitPayment = role === "super_admin";
+  const canPayBalance = role === "super_admin" || role === "admin";
   const canCheckIn =
     role === "super_admin" || role === "admin" || role === "general";
 
@@ -112,43 +112,48 @@ export function PatientActions({
     router.refresh();
   }
 
-  async function addSessionsOrPayBalance() {
+  async function payOutstandingBalance() {
     const paid = Number(amountPaidNow);
-
-    if (payRemainingBalance) {
-      if (paymentBalance <= 0) {
-        flash(null, "No remaining balance to pay.");
-        return;
-      }
-      if (Number.isNaN(paid) || paid <= 0) {
-        flash(null, "Enter a payment amount greater than 0.");
-        return;
-      }
-      if (paid > paymentBalance) {
-        flash(
-          null,
-          `Amount cannot exceed balance (${formatInr(paymentBalance)}).`,
-        );
-        return;
-      }
-      setBusy(true);
-      flash(null, null);
-      const supabase = createClient();
-      const { error: rpcError } = await supabase.rpc("record_patient_payment", {
-        p_patient_id: patientId,
-        p_amount: paid,
-        p_note: "Pay remaining balance",
-      });
-      setBusy(false);
-      if (rpcError) {
-        flash(null, rpcError.message);
-        return;
-      }
-      setPayRemainingBalance(false);
-      flash("Balance payment recorded.", null);
-      router.refresh();
+    if (paymentBalance <= 0) {
+      flash(null, "No remaining balance to pay.");
       return;
     }
+    if (Number.isNaN(paid) || paid <= 0) {
+      flash(null, "Enter a payment amount greater than 0.");
+      return;
+    }
+    if (paid > paymentBalance) {
+      flash(
+        null,
+        `Amount cannot exceed balance (${formatInr(paymentBalance)}).`,
+      );
+      return;
+    }
+    setBusy(true);
+    flash(null, null);
+    const supabase = createClient();
+    const { error: rpcError } = await supabase.rpc("record_patient_payment", {
+      p_patient_id: patientId,
+      p_amount: paid,
+      p_note: "Pay remaining balance",
+    });
+    setBusy(false);
+    if (rpcError) {
+      flash(null, rpcError.message);
+      return;
+    }
+    setPayRemainingBalance(false);
+    setAmountPaidNow("");
+    flash("Balance payment recorded.", null);
+    router.refresh();
+  }
+
+  async function addSessionsOrPayBalance() {
+    if (payRemainingBalance) {
+      await payOutstandingBalance();
+      return;
+    }
+    const paid = Number(amountPaidNow);
 
     if (!packageId) {
       flash(null, "Select a package.");
@@ -282,21 +287,19 @@ export function PatientActions({
         <section className="rounded-xl border border-stone-200 bg-white p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="font-semibold text-stone-900">Add more sessions</h2>
-            {canSplitPayment ? (
-              <label className="flex items-center gap-2 text-sm text-stone-700">
-                <input
-                  type="checkbox"
-                  checked={payRemainingBalance}
-                  disabled={paymentBalance <= 0}
-                  onChange={(e) => setPayRemainingBalance(e.target.checked)}
-                  className="h-4 w-4 rounded border-stone-300 text-teal-800 focus:ring-teal-700"
-                />
-                Pay Remaining Balance
-              </label>
-            ) : null}
+            <label className="flex items-center gap-2 text-sm text-stone-700">
+              <input
+                type="checkbox"
+                checked={payRemainingBalance}
+                disabled={paymentBalance <= 0}
+                onChange={(e) => setPayRemainingBalance(e.target.checked)}
+                className="h-4 w-4 rounded border-stone-300 text-teal-800 focus:ring-teal-700"
+              />
+              Pay Remaining Balance
+            </label>
           </div>
 
-          {canSplitPayment && payRemainingBalance ? (
+          {payRemainingBalance ? (
             <p className="mt-2 text-sm text-amber-800">
               Outstanding balance: <strong>{formatInr(paymentBalance)}</strong>
             </p>
@@ -376,7 +379,58 @@ export function PatientActions({
         </section>
       ) : null}
 
-      {canSplitPayment && payments.length > 0 ? (
+      {canPayBalance && !canAddSessions ? (
+        <section className="rounded-xl border border-stone-200 bg-white p-5">
+          <h2 className="font-semibold text-stone-900">Pay Remaining Balance</h2>
+          <p className="mt-1 text-sm text-stone-600">
+            Outstanding balance:{" "}
+            <strong>{formatInr(paymentBalance)}</strong>
+          </p>
+          {paymentBalance <= 0 ? (
+            <p className="mt-3 text-sm text-stone-500">No balance due.</p>
+          ) : (
+            <div className="mt-3 space-y-3">
+              <label className="block text-sm">
+                <span className="text-stone-700">Amount paid now</span>
+                <input
+                  type="number"
+                  min={0.01}
+                  step="0.01"
+                  max={paymentBalance}
+                  value={amountPaidNow}
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    const n = Number(next);
+                    if (
+                      next !== "" &&
+                      !Number.isNaN(n) &&
+                      n > paymentBalance
+                    ) {
+                      setAmountPaidNow(String(paymentBalance));
+                      return;
+                    }
+                    setAmountPaidNow(next);
+                  }}
+                  className="mt-1 w-full rounded-lg border border-stone-300 px-3 py-2"
+                />
+                <span className="mt-1 block text-xs text-stone-500">
+                  Cannot exceed balance ({formatInr(paymentBalance)}).
+                </span>
+              </label>
+              <button
+                type="button"
+                disabled={busy || paymentBalance <= 0}
+                onClick={() => void payOutstandingBalance()}
+                className="rounded-lg border border-teal-800 px-4 py-2 text-sm font-medium text-teal-900 hover:bg-teal-50 disabled:opacity-50"
+              >
+                Accept balance payment
+              </button>
+            </div>
+          )}
+        </section>
+      ) : null}
+
+      {canPayBalance && payments.length > 0 ? (
         <section className="rounded-xl border border-stone-200 bg-white p-5">
           <h2 className="font-semibold text-stone-900">Payment history</h2>
           <ul className="mt-3 divide-y divide-stone-100 text-sm">

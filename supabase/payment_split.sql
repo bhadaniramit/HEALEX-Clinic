@@ -24,9 +24,10 @@ create policy "payments_staff_or_own_select"
   using (public.is_staff() or patient_id = public.my_patient_id());
 
 drop policy if exists "payments_super_admin_insert" on public.payments;
-create policy "payments_super_admin_insert"
+drop policy if exists "payments_admin_insert" on public.payments;
+create policy "payments_admin_insert"
   on public.payments for insert
-  with check (public.is_super_admin());
+  with check (public.is_admin_or_above());
 
 -- Existing purchases were treated as fully paid — backfill once
 insert into public.payments (patient_id, purchase_id, amount, note, created_by, created_at)
@@ -64,7 +65,7 @@ as $$
     )::numeric;
 $$;
 
--- Super Admin records a payment (toward balance)
+-- Admin / Super Admin records a payment (toward balance)
 create or replace function public.record_patient_payment(
   p_patient_id uuid,
   p_amount numeric,
@@ -83,8 +84,8 @@ begin
     raise exception 'Not authenticated';
   end if;
 
-  if not public.is_super_admin() then
-    raise exception 'Only Super Admin can record split payments';
+  if not public.is_admin_or_above() then
+    raise exception 'Only Admin or Super Admin can record balance payments';
   end if;
 
   if p_amount is null or p_amount <= 0 then
