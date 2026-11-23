@@ -88,10 +88,22 @@ export function printRecommendationsLetterhead(opts: {
     }
     .contact strong { display: block; margin-bottom: 4px; }
     .meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
       margin: 0 0 20px;
       font-size: 11pt;
     }
-    .meta p { margin: 2px 0; }
+    .meta-left p {
+      margin: 0;
+      line-height: 1.25;
+    }
+    .meta-right {
+      text-align: right;
+      white-space: nowrap;
+    }
+    .meta-right p { margin: 0; }
     h2.section {
       font-size: 13pt;
       margin: 18px 0 8px;
@@ -150,9 +162,15 @@ export function printRecommendationsLetterhead(opts: {
     </header>
 
     <div class="meta">
-      <p><strong>Patient:</strong> ${escapeHtml(opts.patientName)}</p>
-      ${opts.phone ? `<p><strong>Mobile:</strong> ${escapeHtml(opts.phone)}</p>` : ""}
-      ${opts.dob ? `<p><strong>DOB:</strong> ${escapeHtml(opts.dob)}</p>` : ""}
+      <div class="meta-left">
+        <p><strong>Patient Name:</strong> ${escapeHtml(opts.patientName)}</p>
+        ${opts.dob ? `<p><strong>DOB:</strong> ${escapeHtml(opts.dob)}</p>` : ""}
+      </div>
+      ${
+        opts.phone
+          ? `<div class="meta-right"><p><strong>Mobile:</strong> ${escapeHtml(opts.phone)}</p></div>`
+          : ""
+      }
     </div>
 
     <h2 class="section">Medicine</h2>
